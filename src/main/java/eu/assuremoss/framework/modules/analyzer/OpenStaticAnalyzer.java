@@ -9,6 +9,7 @@ import eu.assuremoss.framework.model.VulnerabilityEntry;
 import eu.assuremoss.framework.modules.compiler.MavenPatchCompiler;
 import eu.assuremoss.utils.Pair;
 import eu.assuremoss.utils.Utils;
+import eu.assuremoss.utils.VulnParser;
 import lombok.AllArgsConstructor;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -86,6 +87,9 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
         resList.add(new CodeModel(CodeModel.MODEL_TYPES.ASG, new File(asgPath)));
         resList.add(new CodeModel(CodeModel.MODEL_TYPES.OSA_GRAPH_XML, new File(graphXMLPath)));
 
+        String findBugsXMLPath = String.valueOf(Paths.get(workingDir, projectName, "java", "0", "openstaticanalyzer", "temp", projectName + "-FindBugs.xml"));
+        resList.add(new CodeModel(CodeModel.MODEL_TYPES.FINDBUGS_XML, new File(findBugsXMLPath)));
+
         command = new String[] {
                 new File(j2cpPath, j2cpEdition + Utils.getExtension()).getAbsolutePath(),
                 asgPath,
@@ -115,11 +119,21 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
 
     @Override
     public List<VulnerabilityEntry> getVulnerabilityLocations(File srcLocation, List<CodeModel> analysisResults) {
+        for (CodeModel cm : analysisResults) {
+            MLOG.info("Location: " + cm.getModelPath());
+        }
         List<VulnerabilityEntry> resList = new ArrayList<>();
         Optional<CodeModel> graphXML = analysisResults.stream()
                 .filter(cm -> cm.getType() == CodeModel.MODEL_TYPES.OSA_GRAPH_XML).findFirst();
         if (!graphXML.isPresent()) {
             LOG.error("Could not locate GRAPH XML analysis results, no vulnerabilities were retrieved.");
+            return resList;
+        }
+
+        Optional<CodeModel> findBugsXML = analysisResults.stream()
+                .filter(cm -> cm.getType() == CodeModel.MODEL_TYPES.FINDBUGS_XML).findFirst();
+        if (!findBugsXML.isPresent()) {
+            LOG.error("Could not locate FindBugs XML analysis results, no vulnerabilities were retrieved.");
             return resList;
         }
 
@@ -135,9 +149,17 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
                 String nodeName = attributes.item(i).getAttributes().getNamedItem("name").getNodeValue();
                 String nodeContext = attributes.item(i).getAttributes().getNamedItem("context").getNodeValue();
                 if ("warning".equals(nodeContext) && supportedProblemTypes.containsKey(nodeName)) {
+                    // MLOG.info(nodeName);
+                    // MLOG.info(nodeContext);
                     NodeList warnAttributes = attributes.item(i).getChildNodes();
                     String problemType = supportedProblemTypes.get(nodeName);
                     resList.add(createVulnerabilityEntry(warnAttributes, problemType));
+                    // MLOG.info("LENGTH: " + attributes.item(i).getChildNodes().getLength());
+
+                    // TODO: replace .item(3) with actually finding the LineNum Node
+                    String lineNumStr = attributes.item(i).getChildNodes().item(3).getAttributes().getNamedItem("value").getNodeValue();
+                    // MLOG.info("LINENUM: " + attributes.item(i).getChildNodes().item(3).getAttributes().getNamedItem("value").getNodeValue());
+                    VulnParser.findVulnVariableInFindBugsXML(nodeName, lineNumStr, findBugsXML.get());
                 }
             }
         } catch (FileNotFoundException e) {
