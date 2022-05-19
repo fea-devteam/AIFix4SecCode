@@ -10,6 +10,7 @@ import com.google.gson.JsonParser;
 import eu.assuremoss.framework.api.*;
 import eu.assuremoss.framework.model.CodeModel;
 import eu.assuremoss.framework.model.VulnerabilityEntry;
+import eu.assuremoss.framework.modules.compiler.MavenCLIPatchCompiler;
 import eu.assuremoss.framework.modules.compiler.MavenPatchCompiler;
 import eu.assuremoss.framework.modules.src.LocalSourceFolder;
 import eu.assuremoss.utils.Configuration;
@@ -90,19 +91,22 @@ public class VulnRepairDriver {
         for (VulnerabilityEntry vulnEntry : vulnerabilityLocations) {
             // - Init -
             vulnIndex++;
-            PatchCompiler comp = new MavenPatchCompiler();
+            PatchCompiler comp = new MavenCLIPatchCompiler();
 
             // - Generate repair patches -
             MLOG.ninfo(String.format("Generating patches for %d/%d vulnerability", vulnIndex, vulnerabilityLocations.size()));
             List<Pair<File, Pair<Patch<String>, String>>> patches = vulnRepairer.generateRepairPatches(scc.getSourceCodeLocation(), vulnEntry, codeModels);
+            MLOG.info("Generated patches: " + patches.size());
 
             //  - Applying & Compiling patches -
             MLOG.info(String.format("Compiling patches for %d/%d vulnerability", vulnIndex, vulnerabilityLocations.size()));
             List<Pair<File, Pair<Patch<String>, String>>> filteredPatches = comp.applyAndCompile(scc.getSourceCodeLocation(), patches, true);
+            MLOG.info("Filtered patches: " + filteredPatches.size());
 
             //  - Testing Patches -
             MLOG.info(String.format("Verifying patches for %d/%d vulnerability", vulnIndex, vulnerabilityLocations.size()));
             List<Pair<File, Pair<Patch<String>, String>>> candidatePatches = getCandidatePatches(props, scc, vulnEntry, comp, filteredPatches);
+            MLOG.info("Candidate patches: " + filteredPatches.size());
 
             // - Save patches -
             Utils.createDirectoryForPatches(props);
