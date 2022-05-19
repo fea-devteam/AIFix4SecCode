@@ -21,15 +21,17 @@ public class MavenCLIPatchCompiler extends GenericPatchCompiler {
     public boolean compile(File srcLocation, boolean runTests, boolean copyDependencies) {
         List<String> argList = new ArrayList<>();
 
-        System.setProperty("maven.multiModuleProjectDirectory", "/home/wolf/IdeaProjects/easyexcel");
+        String rootProjectPath = srcLocation.getAbsolutePath() + "/../";
+
+        System.setProperty("maven.multiModuleProjectDirectory", rootProjectPath);
 
         argList.add("mvn");
         argList.add("-f");
-        argList.add(srcLocation.getAbsolutePath() + "/../");
+        argList.add(rootProjectPath);
         argList.add("package");
 
         argList.add("-Dpmd.failOnViolation=false");
-        // argList.add("-Dmaster_flatten_skip=true"); does not work!
+        // argList.add("-Dmaster_flatten_skip=true"); does not work! should remove flatten plugin manually!
 
         if (!runTests) {
             argList.add("-DskipTests=true");
