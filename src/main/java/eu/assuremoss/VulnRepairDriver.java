@@ -10,15 +10,13 @@ import com.google.gson.JsonParser;
 import eu.assuremoss.framework.api.*;
 import eu.assuremoss.framework.model.CodeModel;
 import eu.assuremoss.framework.model.VulnerabilityEntry;
+import eu.assuremoss.framework.modules.VulnRepairModules;
 import eu.assuremoss.framework.modules.compiler.MavenPatchCompiler;
 import eu.assuremoss.framework.modules.src.LocalSourceFolder;
-import eu.assuremoss.utils.Configuration;
 import eu.assuremoss.utils.MLogger;
 import eu.assuremoss.utils.Pair;
 import eu.assuremoss.utils.Utils;
 import eu.assuremoss.utils.factories.ToolFactory;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
@@ -31,107 +29,135 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static eu.assuremoss.utils.Configuration.*;
-import static eu.assuremoss.utils.Utils.getConfigFile;
 
 
 /**
  * The main driver class that runs the vulnerability repair workflow
  */
 public class VulnRepairDriver {
-    private static final Logger LOG = LogManager.getLogger(VulnRepairDriver.class);
     public static MLogger MLOG;
+    private VulnRepairModules vulnRepairModules;
+    private final Properties props;
     private int patchCounter = 1;
+    private int vulnIndex = 0;
+    private String currentTime;
 
-    public static void main(String[] args) throws IOException {
-        VulnRepairDriver driver = new VulnRepairDriver();
-        Configuration config = new Configuration(getConfigFile(args));
+    public VulnRepairDriver(Properties properties) throws IOException {
+        this.props = properties;
 
-        Utils.createDirectoryForResults(config.properties);
-        Utils.createDirectoryForValidation(config.properties);
-        Utils.createEmptyLogFile(config.properties);
-
-        MLOG = new MLogger(config.properties, "log.txt");
-
-        driver.bootstrap(config.properties);
+        initResourceFiles(properties);
+        initRepairModules();
+        initLogger();
     }
 
-    public void bootstrap(Properties props) {
+    /**
+     * Creates all resource files (directories, log files)
+     * @param props - a properties object that specifies the creation path of the files
+     */
+    private void initResourceFiles(Properties props) {
+        Utils.createDirectory(props.getProperty(RESULTS_PATH_KEY));
+        Utils.createDirectory(props.getProperty(VALIDATION_RESULTS_PATH_KEY));
+        Utils.createEmptyLogFile(props);
+    }
+
+    /**
+     * Creates all the modules needed for the framework
+     */
+    private void initRepairModules() {
+        vulnRepairModules = VulnRepairModules.builder()
+                .scc(new LocalSourceFolder(props.getProperty(PROJECT_PATH_KEY)))
+                .osa(ToolFactory.createOsa(props))
+                .vulnRepairer(ToolFactory.createASGTransformRepair(props))
+                .vulnDetector(ToolFactory.createOsa(props))
+                .patchCompiler(new MavenPatchCompiler())
+                .build();
+    }
+
+    /**
+     * Creates logger to indicate the current status of the framework
+     */
+    private void initLogger() throws IOException {
+        MLOG = new MLogger(props, "log.txt");
+    }
+
+
+    public void bootstrap() {
         MLOG.fInfo("Start!");
 
-        // 0. Setup
-        String currentTime = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+        saveCurrentTime();
 
-        // 1. Get source code
-        MLOG.info("Project source acquiring started");
-        SourceCodeCollector scc = new LocalSourceFolder(props.getProperty(PROJECT_PATH_KEY));
-        scc.collectSourceCode();
+        acquireSourceCode();
 
-        // 2. Analyze source code
-        MLOG.info("Code analysis started");
-        CodeAnalyzer osa = ToolFactory.createOsa(props);
-        List<CodeModel> codeModels = osa.analyzeSourceCode(scc.getSourceCodeLocation(), false);
+        List<CodeModel> codeModels = analyseSourceCode();
 
-        // 2. Produces :- ASG
-        VulnerabilityRepairer vulnRepairer = ToolFactory.createASGTransformRepair(props);
+        List<VulnerabilityEntry> vulnerabilityLocations = locateVulnerabilities(codeModels);
 
-        // 3. Detect vulnerabilities
-        VulnerabilityDetector vulnDetector = ToolFactory.createOsa(props);
+        Map<String, List<JSONObject>> problemFixMap = new HashMap<>();
 
-        // 3. Produces :- vulnerability locations
-        List<VulnerabilityEntry> vulnerabilityLocations = vulnDetector.getVulnerabilityLocations(scc.getSourceCodeLocation(), codeModels);
-        MLOG.info(String.format("Detected %d vulnerabilities", vulnerabilityLocations.size()));
-        vulnerabilityLocations.forEach(vulnEntry -> MLOG.fInfo(vulnEntry.getType() + " -> " + vulnEntry.getStartLine()));
+        repairCode(codeModels, vulnerabilityLocations, problemFixMap);
 
-        // == Transform code / repair ==
-        Map<String, Integer> problemTypeCounter = new HashMap<>();
-        JSONObject vsCodeConfig = new JSONObject();
+        generateVSCodeConfig(getVSCodeConfig(problemFixMap));
 
-        int vulnIndex = 0;
-        for (VulnerabilityEntry vulnEntry : vulnerabilityLocations) {
-            // - Init -
-            vulnIndex++;
-            PatchCompiler comp = new MavenPatchCompiler();
-
-            // - Generate repair patches -
-            MLOG.ninfo(String.format("Generating patches for vulnerability %d/%d", vulnIndex, vulnerabilityLocations.size()));
-            List<Pair<File, Pair<Patch<String>, String>>> patches = vulnRepairer.generateRepairPatches(scc.getSourceCodeLocation(), vulnEntry, codeModels);
-
-            //  - Applying & Compiling patches -
-            MLOG.info(String.format("Compiling patches for vulnerability %d/%d", vulnIndex, vulnerabilityLocations.size()));
-            List<Pair<File, Pair<Patch<String>, String>>> filteredPatches = comp.applyAndCompile(scc.getSourceCodeLocation(), patches, true);
-
-            //  - Testing Patches -
-            MLOG.info(String.format("Verifying patches for vulnerability %d/%d", vulnIndex, vulnerabilityLocations.size()));
-            List<Pair<File, Pair<Patch<String>, String>>> candidatePatches = getCandidatePatches(props, scc, vulnEntry, comp, filteredPatches);
-
-            // - Save patches -
-            Utils.createDirectoryForPatches(props);
-            if (candidatePatches.isEmpty()) {
-                MLOG.info("No patch candidates were found, skipping!");
-                continue;
-            }
-
-            MLOG.info(String.format("Writing out candidate patches for vulnerability %d/%d", vulnIndex, vulnerabilityLocations.size()));
-            savePatches(props, problemTypeCounter, vsCodeConfig, vulnEntry, candidatePatches);
-
-        }
-
-        try (FileWriter fw = new FileWriter(String.valueOf(Paths.get(patchSavePath(props), "vscode-config.json")))) {
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            JsonElement element = JsonParser.parseString(vsCodeConfig.toJSONString());
-            fw.write(gson.toJson(element));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        if (archiveEnabled(props)) {
-            Utils.archiveResults(patchSavePath(props), props.getProperty(ARCHIVE_PATH), descriptionPath(props), currentTime);
-        }
+        archiveResults(currentTime);
 
         Utils.deleteIntermediatePatches(patchSavePath(props));
     }
 
-    private List<Pair<File, Pair<Patch<String>, String>>> getCandidatePatches(Properties props, SourceCodeCollector scc, VulnerabilityEntry vulnEntry, PatchCompiler comp, List<Pair<File, Pair<Patch<String>, String>>> filteredPatches) {
+    /**
+     * Saves the current time for storing the names of the archived results
+     */
+    private void saveCurrentTime() {
+        currentTime = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+    }
+
+    /**
+     * Acquire the source code that will be analysed by the framework
+     */
+    private void acquireSourceCode() {
+        MLOG.info("Project source acquiring started");
+        vulnRepairModules.scc.collectSourceCode();
+    }
+
+    /**
+     * Analyse the acquired source code in order to
+     */
+    private List<CodeModel> analyseSourceCode() {
+        MLOG.info("Code analysis started");
+        return vulnRepairModules.osa.analyzeSourceCode(vulnRepairModules.scc.getSourceCodeLocation(), false);
+    }
+
+    private List<VulnerabilityEntry> locateVulnerabilities(List<CodeModel> codeModels) {
+        List<VulnerabilityEntry> vulnerabilityLocations = vulnRepairModules.vulnDetector.getVulnerabilityLocations(vulnRepairModules.scc.getSourceCodeLocation(), codeModels);
+
+        MLOG.info(String.format("Detected %d vulnerabilities", vulnerabilityLocations.size()));
+        MLOG.logVulnerabilities(vulnerabilityLocations);
+
+        return vulnerabilityLocations;
+    }
+
+    private void repairCode(List<CodeModel> codeModels, List<VulnerabilityEntry> vulnerabilityLocations, Map<String, List<JSONObject>> problemFixMap) {
+        vulnerabilityLocations.forEach(vulnEntry -> {
+            vulnIndex++;
+            List<Pair<File, Pair<Patch<String>, String>>> repairPatches = generateRepairPatches(codeModels, vulnEntry, vulnerabilityLocations.size());
+            List<Pair<File, Pair<Patch<String>, String>>> filteredPatches = applyAndCompilePatches(repairPatches, vulnerabilityLocations.size());
+            List<Pair<File, Pair<Patch<String>, String>>> candidatePatches = getCandidatePatches(vulnEntry, filteredPatches, vulnerabilityLocations.size());
+            savePatches(vulnerabilityLocations, problemFixMap, vulnEntry, candidatePatches);
+        });
+    }
+
+    private List<Pair<File, Pair<Patch<String>, String>>> generateRepairPatches(List<CodeModel> codeModels, VulnerabilityEntry vulnEntry, int numberOfVulnerabilities) {
+        MLOG.ninfo(String.format("Generating patches for %d/%d vulnerability", vulnIndex, numberOfVulnerabilities));
+        return vulnRepairModules.vulnRepairer.generateRepairPatches(vulnRepairModules.scc.getSourceCodeLocation(), vulnEntry, codeModels);
+    }
+
+    private List<Pair<File, Pair<Patch<String>, String>>> applyAndCompilePatches(List<Pair<File, Pair<Patch<String>, String>>> patches, int numberOfVulnerabilities) {
+        MLOG.info(String.format("Compiling patches for %d/%d vulnerability", vulnIndex, numberOfVulnerabilities));
+        return vulnRepairModules.patchCompiler.applyAndCompile(vulnRepairModules.scc.getSourceCodeLocation(), patches, true);
+    }
+
+    private List<Pair<File, Pair<Patch<String>, String>>> getCandidatePatches(VulnerabilityEntry vulnEntry, List<Pair<File, Pair<Patch<String>, String>>> filteredPatches, int numberOfVulnerabilities) {
+        MLOG.info(String.format("Verifying patches for %d/%d vulnerability", vulnIndex, numberOfVulnerabilities));
+
         List<Pair<File, Pair<Patch<String>, String>>> candidatePatches = new ArrayList<>();
         PatchValidator patchValidator = ToolFactory.createOsa(props);
 
@@ -139,18 +165,54 @@ public class VulnRepairDriver {
             Patch<String> rawPatch = patchWithExplanation.getB().getA();
             Pair<File, Patch<String>> patch = new Pair<>(patchWithExplanation.getA(), rawPatch);
 
-            comp.applyPatch(patch, scc.getSourceCodeLocation());
-            if (patchValidator.validatePatch(scc.getSourceCodeLocation(), vulnEntry, patch)) {
+            vulnRepairModules.patchCompiler.applyPatch(patch, vulnRepairModules.scc.getSourceCodeLocation());
+            if (patchValidator.validatePatch(vulnRepairModules.scc.getSourceCodeLocation(), vulnEntry, patch)) {
                 candidatePatches.add(patchWithExplanation);
             }
-            comp.revertPatch(patch, scc.getSourceCodeLocation());
+            vulnRepairModules.patchCompiler.revertPatch(patch, vulnRepairModules.scc.getSourceCodeLocation());
         }
 
         return candidatePatches;
     }
 
-    private void savePatches(Properties props, Map<String, Integer> problemTypeCounter, JSONObject vsCodeConfig, VulnerabilityEntry vulnEntry, List<Pair<File, Pair<Patch<String>, String>>> candidatePatches) {
+    private void savePatches(List<VulnerabilityEntry> vulnerabilityLocations, Map<String, List<JSONObject>> problemFixMap, VulnerabilityEntry vulnEntry, List<Pair<File, Pair<Patch<String>, String>>> candidatePatches) {
+        Utils.createDirectory(patchSavePath(props));
+        if (candidatePatches.isEmpty()) {
+            MLOG.info("No patch candidates were found, skipping!");
+            return;
+        }
+
+        MLOG.info(String.format("Writing out patch candidates patches for %d/%d vulnerability", vulnIndex, vulnerabilityLocations.size()));
+        if (!problemFixMap.containsKey(vulnEntry.getType())) {
+            problemFixMap.put(vulnEntry.getType(), new ArrayList());
+        }
+        problemFixMap.get(vulnEntry.getType()).add(generateFixEntity(vulnEntry, candidatePatches));
+    }
+
+    private void generateVSCodeConfig(JSONObject vsCodeConfig) {
+        try (FileWriter fw = new FileWriter(String.valueOf(Paths.get(patchSavePath(props), "vscode-config.json")))) {
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            JsonElement element = JsonParser.parseString(vsCodeConfig.toJSONString());
+            fw.write(gson.toJson(element));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private JSONObject getVSCodeConfig(Map<String, List<JSONObject>> problemFixMap) {
+        JSONObject vsCodeConfig = new JSONObject();
+        for (String problemType : problemFixMap.keySet()) {
+            JSONArray fixesArray = new JSONArray();
+            fixesArray.addAll(problemFixMap.get(problemType));
+            vsCodeConfig.put(problemType, fixesArray);
+        }
+
+        return vsCodeConfig;
+    }
+
+    private JSONObject generateFixEntity(VulnerabilityEntry vulnEntry, List<Pair<File, Pair<Patch<String>, String>>> candidatePatches) {
         JSONArray patchesArray = new JSONArray();
+        JSONObject issueObject = new JSONObject();
         for (int i = 0; i < candidatePatches.size(); i++) {
             File path = candidatePatches.get(i).getA();
             Patch<String> patch = candidatePatches.get(i).getB().getA();
@@ -187,10 +249,9 @@ public class VulnRepairDriver {
                 patchObject.put("score", 10);
                 patchesArray.add(patchObject);
             } catch (IOException e) {
-                LOG.error("Failed to save candidate patch: " + patch);
+                MLOG.info("Failed to save candidate patch: " + patch);
             }
         }
-        JSONObject issueObject = new JSONObject();
 
         JSONObject textRangeObject = new JSONObject();
         textRangeObject.put("startLine", vulnEntry.getStartLine());
@@ -201,18 +262,13 @@ public class VulnRepairDriver {
         issueObject.put("patches", patchesArray);
         issueObject.put("textRange", textRangeObject);
 
-        String problemTypeCount;
-        if (problemTypeCounter.get(vulnEntry.getType()) == null) {
-            problemTypeCounter.put(vulnEntry.getType(), 1);
-            problemTypeCount = "";
-        } else {
-            int n = problemTypeCounter.get(vulnEntry.getType());
-            n++;
-            problemTypeCounter.put(vulnEntry.getType(), n);
-            problemTypeCount = "#" + n;
-        }
+        return issueObject;
+    }
 
-        vsCodeConfig.put(vulnEntry.getType() + problemTypeCount, issueObject);
+    private void archiveResults(String currentTime) {
+        if (archiveEnabled(props)) {
+            Utils.archiveResults(patchSavePath(props), props.getProperty(ARCHIVE_PATH), descriptionPath(props), currentTime);
+        }
     }
 
 }

@@ -1,11 +1,14 @@
 package eu.assuremoss.utils;
 
+import eu.assuremoss.framework.model.VulnerabilityEntry;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Properties;
 
 import static eu.assuremoss.utils.Configuration.RESULTS_PATH_KEY;
@@ -72,6 +75,11 @@ public class MLogger {
             e.printStackTrace();
         }
     }
+
+    public void logVulnerabilities(List<VulnerabilityEntry> vulnerabilityLocations) {
+        vulnerabilityLocations.forEach(vulnEntry -> fInfo(vulnEntry.getType() + " -> " + vulnEntry.getStartLine()));
+    }
+
 
     /**
      * Returns the current date in the following format: yyyy/MM/dd HH:mm:ss <br />
