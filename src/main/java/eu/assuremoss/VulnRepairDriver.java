@@ -11,6 +11,7 @@ import eu.assuremoss.framework.api.*;
 import eu.assuremoss.framework.model.CodeModel;
 import eu.assuremoss.framework.model.VulnerabilityEntry;
 import eu.assuremoss.framework.modules.compiler.MavenPatchCompiler;
+import eu.assuremoss.framework.modules.extractor.ColumnInfoExtractor;
 import eu.assuremoss.framework.modules.src.LocalSourceFolder;
 import eu.assuremoss.utils.Configuration;
 import eu.assuremoss.utils.MLogger;
@@ -79,10 +80,19 @@ public class VulnRepairDriver {
 
         // 3. Produces :- vulnerability locations
         List<VulnerabilityEntry> vulnerabilityLocations = vulnDetector.getVulnerabilityLocations(scc.getSourceCodeLocation(), codeModels);
-        MLOG.info(String.format("Detected %d vulnerabilities", vulnerabilityLocations.size()));
-        vulnerabilityLocations.forEach(vulnEntry -> MLOG.fInfo(vulnEntry.getType() + " -> " + vulnEntry.getStartLine()));
+
+        // 3. Attach column info for vulnerability entries
+        ColumnInfoExtractor columnInfoExtractor = new ColumnInfoExtractor();
+        columnInfoExtractor.attachColumnInfo(vulnerabilityLocations);
+
+        for (VulnerabilityEntry vulnEntry : vulnerabilityLocations) {
+            System.out.println(vulnEntry);
+            System.out.println();
+        }
 
         System.exit(2);
+
+        MLOG.info(String.format("Detected %d vulnerabilities", vulnerabilityLocations.size()));
 
         // == Transform code / repair ==
         Map<String, Integer> problemTypeCounter = new HashMap<>();
