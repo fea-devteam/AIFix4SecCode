@@ -82,6 +82,8 @@ public class VulnRepairDriver {
         MLOG.info(String.format("Detected %d vulnerabilities", vulnerabilityLocations.size()));
         vulnerabilityLocations.forEach(vulnEntry -> MLOG.fInfo(vulnEntry.getType() + " -> " + vulnEntry.getStartLine()));
 
+        System.exit(2);
+
         // == Transform code / repair ==
         Map<String, Integer> problemTypeCounter = new HashMap<>();
         JSONObject vsCodeConfig = new JSONObject();
