@@ -14,9 +14,9 @@ import static eu.assuremoss.utils.Configuration.RESULTS_PATH_KEY;
 public class MLogger {
     private Writer fileWriter;
     private Writer unitTestInfoWriter;
-    private String logFileName;
+    public String logFileName;
     private String logFilePath;
-    private final PathHandler path;
+    public final PathHandler path;
 
     public MLogger(Properties props, String logFileName, PathHandler path) throws IOException {
         this.logFileName = logFileName;

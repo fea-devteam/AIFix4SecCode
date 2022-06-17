@@ -17,8 +17,10 @@ public class ProcessRunner {
             String line;
             while ((line = out.readLine()) != null) {
                 MLOG.fInfo(line);
-                MLOG.saveUnitTestInformation(line);
+//                MLOG.saveUnitTestInformation(line);
+                TestInfoExtractor.saveLatestUnitTestResult(line);
             }
+            TestInfoExtractor.saveUnitTestInformationForPatch();
         } catch (IOException e) {
             MLOG.info(String.valueOf(e));
         }
@@ -36,6 +38,7 @@ public class ProcessRunner {
             while ((line = out.readLine()) != null) {
                 MLOG.fInfo(line);
                 MLOG.saveUnitTestInformation(line);
+                TestInfoExtractor.saveLatestUnitTestResult(line);
                 message.append(line);
             }
         } catch (IOException e) {

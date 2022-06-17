@@ -1,11 +1,20 @@
 package eu.assuremoss.utils;
 
+import eu.assuremoss.VulnRepairDriver;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.Writer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static eu.assuremoss.VulnRepairDriver.MLOG;
 
 public class TestInfoExtractor {
     public static int patch = 0;
     public static String fileName = "";
+    public static String resultUnitTestInformation = "";
+    private static Writer unitTestInfoWriter;
 
     /**
      * @return the header of the CSV
@@ -62,5 +71,29 @@ public class TestInfoExtractor {
         }
 
         return logFileName.split("\\.")[0];
+    }
+
+    public static void saveLatestUnitTestResult(String line) {
+        if (line.contains("Tests run")) {
+            resultUnitTestInformation = line;
+        }
+    }
+
+    public static void saveUnitTestInformationForPatch() {
+        if (unitTestInfoWriter == null) {
+            try {
+                unitTestInfoWriter = new FileWriter(VulnRepairDriver.path.patchUnitTests());
+                unitTestInfoWriter.write(TestInfoExtractor.getUnitTestHeaderCSV());
+            } catch (IOException e) {
+                MLOG.error("Could not open: " + VulnRepairDriver.path.patchUnitTests());
+            }
+        }
+
+        try {
+            unitTestInfoWriter.write(TestInfoExtractor.getUnitTestRowCSV(MLOG.logFileName, resultUnitTestInformation));
+            unitTestInfoWriter.flush();
+        } catch (IOException e) {
+            MLOG.error("Could not write to: " + VulnRepairDriver.path.patchUnitTests());
+        }
     }
 }

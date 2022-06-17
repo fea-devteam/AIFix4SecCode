@@ -40,7 +40,7 @@ public class VulnRepairDriver {
     public static MLogger MLOG;
     public static Properties properties;
     private final PatchCompiler patchCompiler;
-    private final PathHandler path;
+    public static PathHandler path;
     private final Statistics statistics;
     private int patchCounter = 1;
 
@@ -53,7 +53,7 @@ public class VulnRepairDriver {
 
     public VulnRepairDriver(Properties properties) throws IOException {
         this.patchCompiler = PatchCompilerFactory.getPatchCompiler(properties.getProperty(PROJECT_BUILD_TOOL_KEY));
-        this.path = new PathHandler(properties);
+        path = new PathHandler(properties);
         this.statistics = new Statistics(path);
         VulnRepairDriver.properties = properties;
 
