@@ -18,9 +18,7 @@ public class ProcessRunner {
             while ((line = out.readLine()) != null) {
                 MLOG.fInfo(line);
 //                MLOG.saveUnitTestInformation(line);
-                TestInfoExtractor.saveLatestUnitTestResult(line);
             }
-            TestInfoExtractor.saveUnitTestInformationForPatch();
         } catch (IOException e) {
             MLOG.info(String.valueOf(e));
         }
@@ -37,8 +35,6 @@ public class ProcessRunner {
             String line;
             while ((line = out.readLine()) != null) {
                 MLOG.fInfo(line);
-                MLOG.saveUnitTestInformation(line);
-                TestInfoExtractor.saveLatestUnitTestResult(line);
                 message.append(line);
             }
         } catch (IOException e) {
@@ -46,5 +42,24 @@ public class ProcessRunner {
         }
 
         return message.toString();
+    }
+
+    public static void runTestModule(ProcessBuilder processBuilder) {
+        processBuilder.redirectErrorStream(true);
+        try {
+            Process process = processBuilder.start();
+            BufferedReader out = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            String line;
+            while ((line = out.readLine()) != null) {
+                MLOG.fInfo(line);
+                System.out.println(line);
+//                MLOG.saveUnitTestInformation(line);
+                TestInfoExtractor.saveLatestUnitTestResult(line);
+            }
+            TestInfoExtractor.saveUnitTestInformationForPatch();
+        } catch (IOException e) {
+            MLOG.info(String.valueOf(e));
+        }
     }
 }

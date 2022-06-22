@@ -101,6 +101,17 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
         processBuilder = new ProcessBuilder(command);
         ProcessRunner.run(processBuilder);
 
+
+        List<String> testArgs = new ArrayList<>();
+
+        testArgs.add("mvn");
+        testArgs.add("test");
+        testArgs.add("-f");
+        testArgs.add(srcLocation.getAbsolutePath() + "/../titan-test/");
+
+        ProcessBuilder processBuilder2 = new ProcessBuilder(testArgs);
+        ProcessRunner.runTestModule(processBuilder2);
+
         return resList;
     }
 

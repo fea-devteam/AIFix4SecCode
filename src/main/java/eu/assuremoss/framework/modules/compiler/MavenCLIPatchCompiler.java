@@ -24,13 +24,24 @@ public class MavenCLIPatchCompiler extends GenericPatchCompiler {
         argList.add(srcLocation.getAbsolutePath());
 
         argList.add("-Dpmd.failOnViolation=false");
-        if (!runTests) argList.add("-DskipTests=true");
+//        if (!runTests) argList.add("-DskipTests=true");
+//        argList.add("-DskipTests=true");
 
         argList.add("clean");
         argList.add("package");
 
         ProcessBuilder processBuilder = new ProcessBuilder(argList);
         String message = ProcessRunner.runAndReturnMessage(processBuilder);
+
+        List<String> testArgs = new ArrayList<>();
+
+        testArgs.add("mvn");
+        testArgs.add("test");
+        testArgs.add("-f");
+        testArgs.add(srcLocation.getAbsolutePath() + "/../titan-test/");
+
+        ProcessBuilder processBuilder2 = new ProcessBuilder(testArgs);
+        ProcessRunner.runTestModule(processBuilder2);
 
         return message.contains("BUILD SUCCESS");
     }
