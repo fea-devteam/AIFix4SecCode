@@ -44,7 +44,7 @@ public class ProcessRunner {
         return message.toString();
     }
 
-    public static void runTestModule(ProcessBuilder processBuilder) {
+    static void runTestModule(ProcessBuilder processBuilder) {
         processBuilder.redirectErrorStream(true);
         try {
             Process process = processBuilder.start();

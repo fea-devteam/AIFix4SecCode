@@ -8,6 +8,7 @@ import eu.assuremoss.framework.api.PatchValidator;
 import eu.assuremoss.framework.api.VulnerabilityDetector;
 import eu.assuremoss.framework.model.CodeModel;
 import eu.assuremoss.framework.model.VulnerabilityEntry;
+import eu.assuremoss.utils.TestInfoExtractor;
 import eu.assuremoss.utils.factories.PatchCompilerFactory;
 import eu.assuremoss.utils.Pair;
 import eu.assuremoss.utils.ProcessRunner;
@@ -102,15 +103,7 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
         ProcessRunner.run(processBuilder);
 
 
-        List<String> testArgs = new ArrayList<>();
-
-        testArgs.add("mvn");
-        testArgs.add("test");
-        testArgs.add("-f");
-        testArgs.add(srcLocation.getAbsolutePath() + "/../titan-test/");
-
-        ProcessBuilder processBuilder2 = new ProcessBuilder(testArgs);
-        ProcessRunner.runTestModule(processBuilder2);
+        TestInfoExtractor.runUnitTestsFromModule(srcLocation, "/../guava-tests/");
 
         return resList;
     }

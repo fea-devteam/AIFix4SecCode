@@ -1,6 +1,7 @@
 package eu.assuremoss.framework.modules.compiler;
 
 import eu.assuremoss.utils.ProcessRunner;
+import eu.assuremoss.utils.TestInfoExtractor;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -33,15 +34,7 @@ public class MavenCLIPatchCompiler extends GenericPatchCompiler {
         ProcessBuilder processBuilder = new ProcessBuilder(argList);
         String message = ProcessRunner.runAndReturnMessage(processBuilder);
 
-        List<String> testArgs = new ArrayList<>();
-
-        testArgs.add("mvn");
-        testArgs.add("test");
-        testArgs.add("-f");
-        testArgs.add(srcLocation.getAbsolutePath() + "/../titan-test/");
-
-        ProcessBuilder processBuilder2 = new ProcessBuilder(testArgs);
-        ProcessRunner.runTestModule(processBuilder2);
+        TestInfoExtractor.runUnitTestsFromModule(srcLocation, "/../guava-tests/");
 
         return message.contains("BUILD SUCCESS");
     }

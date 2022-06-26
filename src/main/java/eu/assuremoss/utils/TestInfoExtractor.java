@@ -2,9 +2,12 @@ package eu.assuremoss.utils;
 
 import eu.assuremoss.VulnRepairDriver;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -95,5 +98,17 @@ public class TestInfoExtractor {
         } catch (IOException e) {
             MLOG.error("Could not write to: " + VulnRepairDriver.path.patchUnitTests());
         }
+    }
+
+    public static void runUnitTestsFromModule(File srcLocation, String modulePath) {
+        List<String> testArgs = new ArrayList<>();
+
+        testArgs.add("mvn");
+        testArgs.add("test");
+        testArgs.add("-f");
+        testArgs.add(srcLocation.getAbsolutePath() + modulePath);
+
+        ProcessBuilder processBuilder2 = new ProcessBuilder(testArgs);
+        ProcessRunner.runTestModule(processBuilder2);
     }
 }
