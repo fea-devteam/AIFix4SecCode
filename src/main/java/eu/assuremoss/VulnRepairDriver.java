@@ -14,6 +14,8 @@ import eu.assuremoss.utils.*;
 import eu.assuremoss.utils.factories.PatchCompilerFactory;
 import eu.assuremoss.framework.modules.src.LocalSourceFolder;
 import eu.assuremoss.utils.factories.ToolFactory;
+import eu.assuremoss.utils.patchPrioritizer.CodeSimilarityAlgorithm;
+import eu.assuremoss.utils.patchPrioritizer.PatchPrioritizer;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.json.simple.JSONArray;
@@ -96,6 +98,7 @@ public class VulnRepairDriver {
 
         // == Transform code / repair ==
         Map<String, List<JSONObject>> problemFixMap = new HashMap<>();
+        PatchPrioritizer patchPrioritizer = new PatchPrioritizer(new CodeSimilarityAlgorithm());
 
         int vulnIndex = 0;
         for (VulnerabilityEntry vulnEntry : vulnerabilityLocations) {
@@ -114,6 +117,9 @@ public class VulnRepairDriver {
             MLOG.ninfo(String.format("Generating patches for vulnerability %d/%d", vulnIndex, vulnerabilityLocations.size()));
             List<Pair<File, Pair<Patch<String>, String>>> patches = vulnRepairer.generateRepairPatches(scc.getSourceCodeLocation(), vulnEntry, codeModels);
             vulnEntry.setGeneratedPatches(patches.size());
+
+            // - Prioritize Patches -
+            patchPrioritizer.prioritize(patches);
 
             //  - Applying & Compiling patches -
             MLOG.info(String.format("Compiling patches for vulnerability %d/%d", vulnIndex, vulnerabilityLocations.size()));
