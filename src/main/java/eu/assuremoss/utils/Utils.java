@@ -18,6 +18,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.InvalidParameterException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -124,7 +125,7 @@ public class Utils {
     }
 
     public static String getConfigFile(String[] args) {
-        if (args.length > 0) {
+        if (args.length == 1) {
             return args[0];
         }
 
@@ -132,7 +133,7 @@ public class Utils {
     }
 
     public static String getMappingFile(String[] args) {
-        if (args.length > 1) {
+        if (args.length == 2) {
             return args[1];
         }
 
@@ -256,4 +257,6 @@ public class Utils {
         if (OS_NAME.contains("Linux")) return "Linux";
         return OS_NAME;
     }
+
+
 }

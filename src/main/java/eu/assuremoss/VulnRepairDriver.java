@@ -12,7 +12,7 @@ import eu.assuremoss.framework.model.CodeModel;
 import eu.assuremoss.framework.model.VulnerabilityEntry;
 import eu.assuremoss.utils.*;
 import eu.assuremoss.utils.factories.PatchCompilerFactory;
-import eu.assuremoss.framework.modules.src.LocalSourceFolder;
+import eu.assuremoss.utils.factories.SourceCodeCollectorFactory;
 import eu.assuremoss.utils.factories.ToolFactory;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -42,18 +42,20 @@ public class VulnRepairDriver {
     private final PatchCompiler patchCompiler;
     private final PathHandler path;
     private final Statistics statistics;
+    private final CLIArgumentHandler CLIArgHandler;
     private int patchCounter = 1;
 
     public static void main(String[] args) throws IOException {
         Configuration config = new Configuration(getConfigFile(args), getMappingFile(args));
-        VulnRepairDriver driver = new VulnRepairDriver(config.properties);
+        VulnRepairDriver driver = new VulnRepairDriver(config.properties, args);
 
         driver.bootstrap(config.properties);
     }
 
-    public VulnRepairDriver(Properties properties) throws IOException {
+    public VulnRepairDriver(Properties properties, String[] args) throws IOException {
         this.patchCompiler = PatchCompilerFactory.getPatchCompiler(properties.getProperty(PROJECT_BUILD_TOOL_KEY));
         this.path = new PathHandler(properties);
+        this.CLIArgHandler = new CLIArgumentHandler(args);
         this.statistics = new Statistics(path);
         VulnRepairDriver.properties = properties;
 
@@ -70,7 +72,7 @@ public class VulnRepairDriver {
 
         // 1. Get source code
         MLOG.info("Project source acquiring started");
-        SourceCodeCollector scc = new LocalSourceFolder(props.getProperty(PROJECT_PATH_KEY));
+        SourceCodeCollector scc = SourceCodeCollectorFactory.getInstance(CLIArgHandler, props);
         scc.collectSourceCode();
 
         // 2. Analyze source code

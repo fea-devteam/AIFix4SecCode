@@ -27,8 +27,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.DataFormatException;
 
-import static eu.assuremoss.utils.Configuration.PROJECT_BUILD_TOOL_KEY;
-import static eu.assuremoss.utils.Configuration.PROJECT_SOURCE_PATH_KEY;
+import static eu.assuremoss.utils.Configuration.*;
 
 @AllArgsConstructor
 public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, PatchValidator {
@@ -45,14 +44,15 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
 
     @Override
     public List<CodeModel> analyzeSourceCode(File srcLocation, boolean isValidation) {
+        // srcLocation is the path of the Single File
         PatchCompiler patchCompiler = PatchCompilerFactory.getPatchCompiler(VulnRepairDriver.properties.getProperty(PROJECT_BUILD_TOOL_KEY));
-        patchCompiler.compile(srcLocation, Configuration.isTestingEnabled(), true);
+        patchCompiler.compile(new File(VulnRepairDriver.properties.getProperty(PROJECT_PATH_KEY)), Configuration.isTestingEnabled(), true);
 
         String workingDir = isValidation ? validation_results_path : resultsPath;
 
         String fbFileListPath = String.valueOf(Paths.get(workingDir, "fb_file_list.txt"));
         try (FileWriter fw = new FileWriter(fbFileListPath)) {
-            fw.write(String.valueOf(Paths.get(srcLocation.getAbsolutePath(), patchCompiler.getBuildDirectoryName())));
+            fw.write(String.valueOf(Paths.get(new File(VulnRepairDriver.properties.getProperty(PROJECT_PATH_KEY)).getAbsolutePath(), patchCompiler.getBuildDirectoryName())));
         } catch (IOException e) {
             LOG.error(e);
         }
@@ -63,7 +63,7 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
                 new File(osaPath, osaEdition + "Java" + Utils.getExtension()).getAbsolutePath(),
                 "-resultsDir=" + workingDir,
                 "-projectName=" + projectName,
-                "-projectBaseDir=" + srcLocation,
+                "-projectBaseDir=" + VulnRepairDriver.properties.getProperty(PROJECT_PATH_KEY), // TODO: move file to new project
                 "-cleanResults=0",
                 "-currentDate=0",
                 "-FBFileList=" + fbFileListPath,
