@@ -44,7 +44,6 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
 
     @Override
     public List<CodeModel> analyzeSourceCode(File srcLocation, boolean isValidation) {
-        // srcLocation is the path of the Single File
         PatchCompiler patchCompiler = PatchCompilerFactory.getPatchCompiler(VulnRepairDriver.properties.getProperty(PROJECT_BUILD_TOOL_KEY));
         patchCompiler.compile(new File(VulnRepairDriver.properties.getProperty(PROJECT_PATH_KEY)), Configuration.isTestingEnabled(), true);
 
@@ -52,7 +51,7 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
 
         String fbFileListPath = String.valueOf(Paths.get(workingDir, "fb_file_list.txt"));
         try (FileWriter fw = new FileWriter(fbFileListPath)) {
-            fw.write(String.valueOf(Paths.get(new File(VulnRepairDriver.properties.getProperty(PROJECT_PATH_KEY)).getAbsolutePath(), patchCompiler.getBuildDirectoryName())));
+            fw.write(String.valueOf(Paths.get(srcLocation.getAbsolutePath(), patchCompiler.getBuildDirectoryName())));
         } catch (IOException e) {
             LOG.error(e);
         }
@@ -63,7 +62,7 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
                 new File(osaPath, osaEdition + "Java" + Utils.getExtension()).getAbsolutePath(),
                 "-resultsDir=" + workingDir,
                 "-projectName=" + projectName,
-                "-projectBaseDir=" + VulnRepairDriver.properties.getProperty(PROJECT_PATH_KEY), // TODO: move file to new project
+                "-projectBaseDir=" + srcLocation.getAbsolutePath(),
                 "-cleanResults=0",
                 "-currentDate=0",
                 "-FBFileList=" + fbFileListPath,
@@ -74,7 +73,7 @@ public class OpenStaticAnalyzer implements CodeAnalyzer, VulnerabilityDetector, 
                 "-runDCF=false",
                 "-runMetricHunter=false",
                 "-runLIM2Patterns=false",
-                "-FBOptions=-auxclasspath " + Paths.get(srcLocation.getAbsolutePath(), patchCompiler.getBuildDirectoryName(), "dependency")
+                "-FBOptions=-auxclasspath " + Paths.get(VulnRepairDriver.properties.getProperty(PROJECT_PATH_KEY), patchCompiler.getBuildDirectoryName(), "dependency")
         };
         ProcessBuilder processBuilder = new ProcessBuilder(command);
         ProcessRunner.run(processBuilder);
