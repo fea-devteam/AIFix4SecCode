@@ -124,20 +124,20 @@ public class Utils {
         fis.close();
     }
 
-    public static String getConfigFile(String[] args) {
-        if (args.length == 1) {
-            return args[0];
+    public static String getConfigFile(CLIArgumentHandler CLIArgHandler) {
+        try {
+            return CLIArgHandler.getFlagValue(CLIFlag.CONFIG_FILE);
+        } catch (Exception ignored) {
+            return DEFAULT_CONFIG_FILE_NAME;
         }
-
-        return DEFAULT_CONFIG_FILE_NAME;
     }
 
-    public static String getMappingFile(String[] args) {
-        if (args.length == 2) {
-            return args[1];
+    public static String getMappingFile(CLIArgumentHandler CLIArgHandler) {
+        try {
+            return CLIArgHandler.getFlagValue(CLIFlag.MAP_FILE);
+        } catch (Exception ignored) {
+            return DEFAULT_MAPPING_FILE_NAME;
         }
-
-        return DEFAULT_MAPPING_FILE_NAME;
     }
 
     public static void createDirectory(String path) {

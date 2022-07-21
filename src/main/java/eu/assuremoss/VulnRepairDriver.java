@@ -46,7 +46,9 @@ public class VulnRepairDriver {
     private int patchCounter = 1;
 
     public static void main(String[] args) throws IOException {
-        Configuration config = new Configuration(getConfigFile(args), getMappingFile(args));
+        CLIArgumentHandler CLIArgHandler = new CLIArgumentHandler(args);
+
+        Configuration config = new Configuration(getConfigFile(CLIArgHandler), getMappingFile(CLIArgHandler));
         VulnRepairDriver driver = new VulnRepairDriver(config.properties, args);
 
         driver.bootstrap(config.properties);
