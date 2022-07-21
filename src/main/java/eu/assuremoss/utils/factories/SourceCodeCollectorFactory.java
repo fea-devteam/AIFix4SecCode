@@ -13,8 +13,8 @@ import static eu.assuremoss.utils.Configuration.PROJECT_PATH_KEY;
 public class SourceCodeCollectorFactory {
 
     public static SourceCodeCollector getInstance(CLIArgumentHandler CLIArgHandler, Properties props) {
-        if (CLIArgHandler.isFlagWithValueExists(CLIFlag.SINGLE_FILE_FLAG)){
-            return new LocalSourceFile(CLIArgHandler.getFlagValue(CLIFlag.SINGLE_FILE_FLAG));
+        if (CLIArgHandler.isFlagWithValueExists(CLIFlag.SINGLE_FILE)){
+            return new LocalSourceFile(CLIArgHandler.getFlagValue(CLIFlag.SINGLE_FILE));
         }
 
         return new LocalSourceFolder(props.getProperty(PROJECT_PATH_KEY));
